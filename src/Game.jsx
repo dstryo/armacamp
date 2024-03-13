@@ -17,10 +17,9 @@ function Game() {
 
   return (
     <>
-      <Platform />
       <Floor />
       <EnemyNpcs />
-      <Player position={[0, 1, 0]} />
+      <Player position={[0, 0.5, 0]} />
     </>
   )
 }

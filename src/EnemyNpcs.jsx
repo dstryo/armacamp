@@ -5,14 +5,18 @@ import * as THREE from 'three'
 import { useLaser } from './laser'
 import { useStore } from './store'
 
-const positions = [
-  [5, 1, 0],
-  [0, 1, 5],
-  [0, 1, -5],
-  [-5, 1, 0]
-]
+const positions = [[5, 1, 0]]
 
 function EnemyNpc({ position, players }) {
+  const refPosition = new THREE.Vector3()
+  const turretPosition = new THREE.Vector3()
+  const direction = new THREE.Vector3()
+  const turretLaserDirection = new THREE.Vector3()
+  const laserPosition = new THREE.Vector3()
+  const EnemyNpcPosition = new THREE.Vector3()
+  const EnemyNpcRadius = useMemo(() => (Math.sqrt(3) * 2) / 2.9, [])
+  const raycaster = new THREE.Raycaster()
+  const { decreasePlayerHealth } = useStore((state) => state.actions)
   const { scene } = useThree()
   const turretLasers = useStore((state) => state.turretLasers)
   const [health, setHealth] = useState(100)
@@ -68,38 +72,38 @@ function EnemyNpc({ position, players }) {
     if (turretRef.current && players.length > 0) {
       // Get the position of the first player
       const playerPosition = players[0]
-      const refPosition = new THREE.Vector3().setFromMatrixPosition(ref.current.matrixWorld)
+      refPosition.setFromMatrixPosition(ref.current.matrixWorld)
 
       // Set the position of the turretRef to the ref's position
       turretRef.current.position.set(refPosition.x, refPosition.y + 1, refPosition.z)
-      // Calculate the player's velocity
 
       // Calculate the distance between the turret and the player
-      const turretPosition = new THREE.Vector3().setFromMatrixPosition(turretRef.current.matrixWorld)
+      turretPosition.setFromMatrixPosition(turretRef.current.matrixWorld)
       const distance = turretPosition.distanceTo(playerPosition)
 
       // If the player is within a distance of 20, shoot lasers
       if (distance <= 50) {
         // Make the turret look at the future position of the player
-        turretRef.current.lookAt(playerPosition.x, playerPosition.y + 1.9, playerPosition.z)
+        turretRef.current.lookAt(playerPosition.x, playerPosition.y + 1, playerPosition.z)
 
         // Fire a rectangle (laser) at the player
         shootLasers()
       }
 
       if (distance > 20) {
-        const direction = new THREE.Vector3().subVectors(playerPosition, turretPosition).normalize()
+        direction.subVectors(playerPosition, turretPosition)
+        direction.normalize() // Call normalize once
         api.velocity.set(direction.x * 20, direction.y * 20, direction.z * 20) // Multiply by a scalar to adjust the speed
       } else if (distance < 5) {
         // If the enemy is too close to the player, stop moving
         api.velocity.set(0, 0, 0)
       }
 
-      const raycaster = new THREE.Raycaster()
       raycaster.linePrecision = 0.0001
 
       turretLasers.forEach((turretLaser, index) => {
-        const turretLaserDirection = new THREE.Vector3().subVectors(playerPosition, turretRef.current.position).normalize()
+        turretLaserDirection.subVectors(playerPosition, turretRef.current.position)
+        turretLaserDirection.normalize() // Call normalize once
         turretLaser.position.add(turretLaserDirection.clone().multiplyScalar(1.2))
         // Adjust the speed as needed
         raycaster.set(turretLaser.position, turretLaserDirection)
@@ -114,8 +118,11 @@ function EnemyNpc({ position, players }) {
         }
         if (distanceToPlayer <= 1) {
           // Perform any additional logic here...
+          turretLaserGroup.current.remove(turretLaser)
+          // Remove the laser from the state as well
+          turretLasers.splice(turretLasers.indexOf(turretLaser), 1)
 
-          console.log('hit')
+          decreasePlayerHealth()
         }
       })
     }
@@ -123,14 +130,13 @@ function EnemyNpc({ position, players }) {
     //Map over Player lasers and check for collisions
     lasers.forEach((laser, index) => {
       // Add a delay before checking for collisions
-      const laserPosition = laser.position
+      laserPosition.copy(laser.position)
       // Get the position of the laser
       if (turretRef.current) {
-        const EnemyNpcPosition = new THREE.Vector3().setFromMatrixPosition(ref.current.matrixWorld)
+        EnemyNpcPosition.setFromMatrixPosition(ref.current.matrixWorld)
 
         const distance = laserPosition.distanceTo(EnemyNpcPosition)
 
-        const EnemyNpcRadius = (Math.sqrt(3) * 2) / 2.9
         // Check if the distance is less than the sum of the radii
         if (distance < EnemyNpcRadius) {
           setHealth(health - 10)

@@ -1,4 +1,4 @@
-import React, { useCallback, Suspense, useMemo, useRef, useEffect } from 'react'
+import React, { useState, useCallback, Suspense, useMemo, useRef, useEffect } from 'react'
 import { Vector3, Euler, Quaternion, Matrix4, Raycaster } from 'three'
 import Eve from './Eve'
 import { useCompoundBody } from '@react-three/cannon'
@@ -9,8 +9,10 @@ import useFollowCam from './useFollowCam'
 import { useStore } from './store'
 import Torso from './Torso'
 import { useLaser } from './laser'
+import * as THREE from 'three'
 
 const Player = React.memo(function Player({ position }) {
+  const { turretLasers } = useStore((state) => state)
   const playerGrounded = useRef(false)
   const inJumpAction = useRef(false)
   const group = useRef()
@@ -34,8 +36,13 @@ const Player = React.memo(function Player({ position }) {
   const raycaster = useMemo(() => new Raycaster(), [])
   const defaultPosition = new Vector3(0, 0, -50)
   const containerGroup = useRef()
-
+  const [health, setHealth] = useState(100)
   const { lasers, laserGroup, isRightMouseDown, handleMouseDown, handleMouseUp, shootLasers, updateLasers } = useLaser(secondGroup)
+  const { playerHealth, decreasePlayerHealth } = useStore((state) => ({
+    playerHealth: state.playerHealth,
+    decreasePlayerHealth: state.actions.decreasePlayerHealth
+  }))
+  const { setPlayerHealth } = useStore((state) => state.actions)
 
   useEffect(() => {
     addPlayer(group.current.position)
@@ -177,13 +184,10 @@ const Player = React.memo(function Player({ position }) {
   }
 
   function handleResetPosition(worldPosition, body, group, setFinished, setTime) {
-    if (worldPosition.y < -3) {
-      body.velocity.set(0, 0, 0)
-      body.position.set(0, 1, 0)
-      group.current.position.set(0, 1, 0)
-      setFinished(false)
-      setTime(0)
-    }
+    setPlayerHealth(100)
+    body.velocity.set(0, 0, 0)
+    body.position.set(0, 1, 0)
+    group.current.position.set(0, 1, 0)
   }
 
   const handlePositionLerp = useCallback((worldPosition, group, secondGroup) => {
@@ -205,8 +209,12 @@ const Player = React.memo(function Player({ position }) {
     let activeAction = setActiveAction(keyboard, delta)
     handleInputVelocity(keyboard, delta, activeAction, prevActiveAction, actions, inputVelocity, body, velocity, euler, quat)
     handleMixerUpdate(mixer, activeAction, delta, distance)
-    handleResetPosition(worldPosition, body, group, setFinished, setTime)
+
     handlePositionLerp(worldPosition, group, secondGroup)
+
+    if (playerHealth <= 0) {
+      handleResetPosition(worldPosition, body, group, setFinished, setTime)
+    }
   })
 
   return (
