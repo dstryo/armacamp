@@ -46,7 +46,6 @@ export default function useFollowCam(ref, offset) {
     camera.position.set(offset[0], 0, offset[2])
 
     alt.add(secondGroup)
-    console.log(secondGroup)
 
     document.addEventListener('mousemove', onDocumentMouseMove)
     document.addEventListener('mousewheel', onDocumentMouseWheel, { passive: false })
@@ -57,8 +56,8 @@ export default function useFollowCam(ref, offset) {
   }, [camera])
 
   useFrame((_, delta) => {
-    ref.current.getWorldPosition(worldPosition)
-    pivot.position.lerp(worldPosition, delta * 5)
+    secondGroup.current.getWorldPosition(worldPosition)
+    pivot.position.set(worldPosition.x, worldPosition.y, worldPosition.z)
   })
 
   return { pivot, alt, yaw, pitch, secondGroup }

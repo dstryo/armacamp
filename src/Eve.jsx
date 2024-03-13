@@ -10,7 +10,7 @@ export default function Eve() {
     <>
       <group ref={ref}>
         <mesh castShadow receiveShadow>
-          <meshStandardMaterial color="white" />
+          <meshStandardMaterial color="grey" />
           <boxGeometry />
         </mesh>
       </group>

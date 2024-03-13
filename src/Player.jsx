@@ -1,17 +1,16 @@
-import { Suspense, useMemo, useRef, useEffect, useState } from 'react'
-import { Vector3, Euler, Quaternion, Matrix4, Raycaster, SphereGeometry, MeshBasicMaterial, Mesh } from 'three'
+import React, { useCallback, Suspense, useMemo, useRef, useEffect } from 'react'
+import { Vector3, Euler, Quaternion, Matrix4, Raycaster } from 'three'
 import Eve from './Eve'
 import { useCompoundBody } from '@react-three/cannon'
 import useKeyboard from './useKeyboard'
 import { useFrame, useThree } from '@react-three/fiber'
 import { Vec3 } from 'cannon-es'
 import useFollowCam from './useFollowCam'
-import { useStore } from './App'
+import { useStore } from './store'
 import Torso from './Torso'
-import * as THREE from 'three'
-import { Object3D } from 'three'
+import { useLaser } from './laser'
 
-export default function Player({ position }) {
+const Player = React.memo(function Player({ position }) {
   const playerGrounded = useRef(false)
   const inJumpAction = useRef(false)
   const group = useRef()
@@ -30,115 +29,40 @@ export default function Player({ position }) {
   const keyboard = useKeyboard()
   const secondGroupPosition = useMemo(() => new Vector3(), [])
   const { groundObjects, actions, mixer, setTime, setFinished } = useStore((state) => state)
+  const { addPlayer } = useStore((state) => state.actions)
   const reticule = useRef() // Ref for the reticule mesh
   const raycaster = useMemo(() => new Raycaster(), [])
   const defaultPosition = new Vector3(0, 0, -50)
-  const lasers = useStore((state) => state.lasers)
-  const laserGroup = useRef()
-  const [isRightMouseDown, setRightMouseDown] = useState(false)
-  const handleMouseDown = (event) => {
-    if (event.button === 2) {
-      setRightMouseDown(true)
-    }
-  }
+  const containerGroup = useRef()
 
-  const handleMouseUp = (event) => {
-    if (event.button === 2) {
-      setRightMouseDown(false)
-    }
-  }
-
-  const shootLasers = () => {
-    // Create lasers and set their positions
-    const laserGeometry = new THREE.BoxGeometry(0.1, 0.1, 0.5)
-    const laserMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 })
-    const laserMesh = new THREE.Mesh(laserGeometry, laserMaterial)
-    laserMesh.position.set(secondGroup.current.position.x, secondGroup.current.position.y + 1, secondGroup.current.position.z)
-    laserMesh.quaternion.copy(secondGroup.current.quaternion)
-
-    // Add the lasers to the scene
-    laserGroup.current.add(laserMesh)
-
-    // Add the lasers to the state for later reference
-    lasers.push(laserMesh)
-  }
+  const { lasers, laserGroup, isRightMouseDown, handleMouseDown, handleMouseUp, shootLasers, updateLasers } = useLaser(secondGroup)
 
   useEffect(() => {
+    addPlayer(group.current.position)
     document.addEventListener('mousedown', handleMouseDown)
     document.addEventListener('mouseup', handleMouseUp)
+    document.addEventListener('mousemove', updateMouseMovement)
 
     return () => {
       document.removeEventListener('mousedown', handleMouseDown)
       document.removeEventListener('mouseup', handleMouseUp)
-    }
-  }, [])
-
-  const containerGroup = useRef()
-
-  const { camera } = useThree()
-
-  useEffect(() => {
-    document.addEventListener('mousemove', updateMouseMovement)
-    return () => {
       document.removeEventListener('mousemove', updateMouseMovement)
     }
-  }, [updateMouseMovement])
+  }, [handleMouseDown, handleMouseUp, updateMouseMovement])
 
-  // Create the reticule mesh
-  useEffect(() => {
-    const geometry = new SphereGeometry(0.05, 16, 16)
-    const material = new MeshBasicMaterial({ color: 0xff0000 })
-    const mesh = new Mesh(geometry, material)
-    reticule.current = mesh
-    containerGroup.current.add(mesh) // Add the reticule to the group
-    return () => {
-      containerGroup.current.remove(mesh) // Remove the reticule when the component unmounts
-    }
-  }, [])
-
-  useFrame(({ raycaster }, delta) => {
-    lasers.forEach((laser) => {
-      // Assuming lasers have a property like 'direction' that indicates their movement direction
-      const laserDirection = new Vector3(0, 0, -1).applyQuaternion(laser.quaternion)
-      laser.position.add(laserDirection.clone().multiplyScalar(100 * delta)) // Adjust the speed as needed
-
-      // You may also want to remove lasers that are too far from the player
-      if (laser.position.distanceTo(group.current.position) > 100) {
-        laserGroup.current.remove(laser)
-        // Remove the laser from the state as well
-        lasers.splice(lasers.indexOf(laser), 1)
-      }
-    })
-
-    if (isRightMouseDown) {
-      shootLasers()
-    }
-    // Update the raycaster based on the mouse position
-    raycaster.setFromCamera({ x: 0, y: 0 }, camera)
-
-    // Find intersections with objects in the scene
-    const intersects = raycaster.intersectObjects(Object.values(groundObjects), false)
-
-    if (intersects.length > 0) {
-      // If there is an intersection, update the reticule's position
-      const intersection = intersects[0]
-      reticule.current.position.copy(intersection.point)
-    } else if (reticule.current) {
-      // Also check here for reticule.current before accessing its properties
-      defaultPosition.set(0, 0, -50)
-      defaultPosition.applyMatrix4(camera.matrixWorld)
-      reticule.current.position.lerp(defaultPosition, 0.6)
-    }
-  })
+  const shapes = useMemo(
+    () => [
+      { args: [0.25], position: [0, 0.25, 0], type: 'Sphere' },
+      { args: [0.25], position: [0, 0.75, 0], type: 'Sphere' },
+      { args: [0.25], position: [0, 1.25, 0], type: 'Sphere' }
+    ],
+    []
+  )
 
   const [ref, body] = useCompoundBody(
     () => ({
       mass: 1,
-      shapes: [
-        { args: [0.25], position: [0, 0.25, 0], type: 'Sphere' },
-        { args: [0.25], position: [0, 0.75, 0], type: 'Sphere' },
-        { args: [0.25], position: [0, 1.25, 0], type: 'Sphere' }
-      ],
+      shapes,
       onCollide: (e) => {
         if (e.contact.bi.id !== e.body.id) {
           contactNormal.set(...e.contact.ni)
@@ -146,7 +70,7 @@ export default function Player({ position }) {
         if (contactNormal.dot(down) > 0.5) {
           if (inJumpAction.current) {
             // landed
-            inJumpAction.current = false
+            inJumpAction.current = true
             actions['jump']
           }
         }
@@ -167,40 +91,36 @@ export default function Player({ position }) {
 
     // Convert euler angles to quaternion
     gaze.setFromEuler(euler)
-
-    console.log(euler.x)
     secondGroup.current.setRotationFromQuaternion(gaze)
   }
 
-  useFrame(({ raycaster }, delta) => {
-    let activeAction = 0 // 0:idle, 1:walking, 2:jumping
-    body.angularFactor.set(0, 0, 0)
+  const setActiveAction = useCallback((keyboard, delta) => {
+    let activeAction = 0
+    if (keyboard['KeyW'] || keyboard['KeyS'] || keyboard['KeyA'] || keyboard['KeyD']) {
+      activeAction = 1
+    }
+    if (keyboard['Space']) {
+      activeAction = 2
+    }
+    return activeAction
+  })
 
-    ref.current.getWorldPosition(worldPosition)
-
+  const handlePlayerGrounded = useCallback((raycaster, worldPosition, groundObjects) => {
     playerGrounded.current = false
     raycasterOffset.copy(worldPosition)
     raycasterOffset.y += 0.01
     raycaster.set(raycasterOffset, down)
-    raycaster.intersectObjects(Object.values(groundObjects), false).forEach((i) => {
-      if (i.distance < 0.028) {
+    const intersectObjects = raycaster.intersectObjects(Object.values(groundObjects), false)
+    for (let i = 0; i < intersectObjects.length; i++) {
+      if (intersectObjects[i].distance < 0.028) {
         playerGrounded.current = true
+        break
       }
-    })
-    if (!playerGrounded.current) {
-      body.linearDamping.set(0) // in the air
-    } else {
-      body.linearDamping.set(0.9999999)
     }
+  }, [])
 
-    const distance = worldPosition.distanceTo(group.current.position)
-
-    if (document.pointerLockElement) {
-      updateSecondGroupQuaternion()
-    }
-
+  const handleQuaternionUpdate = useCallback((worldPosition, group, targetQuaternion, rotationMatrix, distance, delta) => {
     rotationMatrix.lookAt(worldPosition, group.current.position, group.current.up)
-
     targetQuaternion.setFromRotationMatrix(rotationMatrix)
     if (distance > 0.0001 && !group.current.quaternion.equals(targetQuaternion)) {
       targetQuaternion.z = 0
@@ -208,27 +128,23 @@ export default function Player({ position }) {
       targetQuaternion.normalize()
       group.current.quaternion.rotateTowards(targetQuaternion, delta * 6)
     }
+  }, [])
 
+  const handleInputVelocity = useCallback((keyboard, delta, activeAction, prevActiveAction, actions, inputVelocity, body, velocity, euler, quat) => {
     inputVelocity.set(0, 0, 0)
     if (playerGrounded.current) {
-      // if grounded I can walk
       if (keyboard['KeyW']) {
-        activeAction = 1
-        inputVelocity.z = -120 * delta
+        inputVelocity.z = -200 * delta
       }
       if (keyboard['KeyS']) {
-        activeAction = 1
-        inputVelocity.z = 120 * delta
+        inputVelocity.z = 200 * delta
       }
       if (keyboard['KeyA']) {
-        activeAction = 1
-        inputVelocity.x = -120 * delta
+        inputVelocity.x = -200 * delta
       }
       if (keyboard['KeyD']) {
-        activeAction = 1
-        inputVelocity.x = 120 * delta
+        inputVelocity.x = 200 * delta
       }
-
       if (activeAction !== prevActiveAction.current) {
         if (prevActiveAction.current !== 1 && activeAction === 1) {
           actions['walk']
@@ -240,42 +156,57 @@ export default function Player({ position }) {
         }
         prevActiveAction.current = activeAction
       }
-
       if (keyboard['Space']) {
         if (playerGrounded.current && !inJumpAction.current) {
-          activeAction = 2
-          inJumpAction.current = true
+          inJumpAction.current = false
           actions['jump']
           inputVelocity.y = 6
         }
       }
-
       euler.y = yaw.rotation.y
       euler.order = 'YZX'
       quat.setFromEuler(euler)
       inputVelocity.applyQuaternion(quat)
       velocity.set(inputVelocity.x, inputVelocity.y, inputVelocity.z)
-
       body.applyImpulse([velocity.x, velocity.y, velocity.z], [0, 0, 0])
     }
+  }, [])
 
-    if (activeAction === 1) {
-      mixer.update(delta * distance * 22.5)
-    } else {
-      mixer.update(delta)
-    }
+  function handleMixerUpdate(mixer, activeAction, delta, distance) {
+    mixer.update(activeAction === 1 ? delta * distance * 22.5 : delta)
+  }
 
+  function handleResetPosition(worldPosition, body, group, setFinished, setTime) {
     if (worldPosition.y < -3) {
       body.velocity.set(0, 0, 0)
       body.position.set(0, 1, 0)
       group.current.position.set(0, 1, 0)
-
       setFinished(false)
       setTime(0)
     }
+  }
 
+  const handlePositionLerp = useCallback((worldPosition, group, secondGroup) => {
     group.current.position.lerp(worldPosition, 0.9)
     secondGroup.current.position.lerp(worldPosition, 0.9)
+  }, [])
+
+  useFrame(({ raycaster }, delta) => {
+    updateLasers(group, delta)
+    body.angularFactor.set(0, 0, 0)
+    ref.current.getWorldPosition(worldPosition)
+    handlePlayerGrounded(raycaster, worldPosition, groundObjects)
+    body.linearDamping.set(playerGrounded.current ? 0.9999999 : 0)
+    const distance = worldPosition.distanceTo(group.current.position)
+    if (document.pointerLockElement) {
+      updateSecondGroupQuaternion()
+    }
+    handleQuaternionUpdate(worldPosition, group, targetQuaternion, rotationMatrix, distance, delta)
+    let activeAction = setActiveAction(keyboard, delta)
+    handleInputVelocity(keyboard, delta, activeAction, prevActiveAction, actions, inputVelocity, body, velocity, euler, quat)
+    handleMixerUpdate(mixer, activeAction, delta, distance)
+    handleResetPosition(worldPosition, body, group, setFinished, setTime)
+    handlePositionLerp(worldPosition, group, secondGroup)
   })
 
   return (
@@ -296,4 +227,6 @@ export default function Player({ position }) {
       <group ref={laserGroup}></group>
     </group>
   )
-}
+})
+
+export default Player
