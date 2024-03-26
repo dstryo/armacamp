@@ -1,9 +1,9 @@
-import React, { useState, useCallback, Suspense, useMemo, useRef, useEffect } from 'react'
-import { Vector3, Euler, Quaternion, Matrix4, Raycaster } from 'three'
+import React, { useCallback, Suspense, useMemo, useRef, useEffect } from 'react'
+import { Vector3, Euler, Quaternion, Matrix4 } from 'three'
 import Eve from './Eve'
 import { useCompoundBody } from '@react-three/cannon'
 import useKeyboard from './useKeyboard'
-import { useFrame, useThree } from '@react-three/fiber'
+import { useFrame } from '@react-three/fiber'
 import { Vec3 } from 'cannon-es'
 import useFollowCam from './useFollowCam'
 import { useStore } from './store'
@@ -11,8 +11,9 @@ import Torso from './Torso'
 import { useLaser } from './laser'
 import * as THREE from 'three'
 
+import { useReticule } from './useReticule'
+
 const Player = React.memo(function Player({ position }) {
-  const { turretLasers } = useStore((state) => state)
   const playerGrounded = useRef(false)
   const inJumpAction = useRef(false)
   const group = useRef()
@@ -32,17 +33,23 @@ const Player = React.memo(function Player({ position }) {
   const secondGroupPosition = useMemo(() => new Vector3(), [])
   const { groundObjects, actions, mixer, setTime, setFinished } = useStore((state) => state)
   const { addPlayer } = useStore((state) => state.actions)
-  const reticule = useRef() // Ref for the reticule mesh
-  const raycaster = useMemo(() => new Raycaster(), [])
-  const defaultPosition = new Vector3(0, 0, -50)
   const containerGroup = useRef()
-  const [health, setHealth] = useState(100)
-  const { lasers, laserGroup, isRightMouseDown, handleMouseDown, handleMouseUp, shootLasers, updateLasers } = useLaser(secondGroup)
-  const { playerHealth, decreasePlayerHealth } = useStore((state) => ({
+  const reticule = useReticule(containerGroup)
+  const { laserGroup, handleMouseDown, handleMouseUp, updateLasers } = useLaser(secondGroup)
+  const { playerHealth } = useStore((state) => ({
     playerHealth: state.playerHealth,
     decreasePlayerHealth: state.actions.decreasePlayerHealth
   }))
   const { setPlayerHealth } = useStore((state) => state.actions)
+  const setGroupRef = useCallback((groupRef) => {
+    group.current = groupRef
+  }, [])
+
+  const setSecondGroupRef = useCallback((secondGroupRef) => {
+    secondGroup.current = secondGroupRef
+  }, [])
+  let accumulator = 0
+  const fixedDeltaTime = 1 / 60
 
   useEffect(() => {
     addPlayer(group.current.position)
@@ -59,9 +66,8 @@ const Player = React.memo(function Player({ position }) {
 
   const shapes = useMemo(
     () => [
-      { args: [0.25], position: [0, 0.25, 0], type: 'Sphere' },
-      { args: [0.25], position: [0, 0.75, 0], type: 'Sphere' },
-      { args: [0.25], position: [0, 1.25, 0], type: 'Sphere' }
+      { args: [1, 1, 1], position: [0, 0.5, 0], type: 'Box' },
+      { args: [0.25, 0.5, 0.5], position: [0, 1.25, 0], type: 'Box' }
     ],
     []
   )
@@ -141,24 +147,24 @@ const Player = React.memo(function Player({ position }) {
     inputVelocity.set(0, 0, 0)
     if (playerGrounded.current) {
       if (keyboard['KeyW']) {
-        inputVelocity.z = -200 * delta
+        inputVelocity.z = -6
       }
       if (keyboard['KeyS']) {
-        inputVelocity.z = 200 * delta
+        inputVelocity.z = 6
       }
       if (keyboard['KeyA']) {
-        inputVelocity.x = -200 * delta
+        inputVelocity.x = -6
       }
       if (keyboard['KeyD']) {
-        inputVelocity.x = 200 * delta
+        inputVelocity.x = 6
       }
       if (activeAction !== prevActiveAction.current) {
         if (prevActiveAction.current !== 1 && activeAction === 1) {
-          actions['walk']
+          actions['ArmatureAction.001']
           actions['idle']
         }
         if (prevActiveAction.current !== 0 && activeAction === 0) {
-          actions['idle']
+          actions['ArmatureAction.001']
           actions['walk']
         }
         prevActiveAction.current = activeAction
@@ -179,23 +185,28 @@ const Player = React.memo(function Player({ position }) {
     }
   }, [])
 
-  function handleMixerUpdate(mixer, activeAction, delta, distance) {
+  const handleMixerUpdate = useCallback((mixer, activeAction, delta, distance) => {
     mixer.update(activeAction === 1 ? delta * distance * 22.5 : delta)
-  }
-
-  function handleResetPosition(worldPosition, body, group, setFinished, setTime) {
-    setPlayerHealth(100)
-    body.velocity.set(0, 0, 0)
-    body.position.set(0, 1, 0)
-    group.current.position.set(0, 1, 0)
-  }
-
-  const handlePositionLerp = useCallback((worldPosition, group, secondGroup) => {
-    group.current.position.lerp(worldPosition, 0.9)
-    secondGroup.current.position.lerp(worldPosition, 0.9)
   }, [])
 
-  useFrame(({ raycaster }, delta) => {
+  const handleResetPosition = useCallback(
+    (worldPosition, body, group, setFinished, setTime) => {
+      setPlayerHealth(100)
+      body.velocity.set(0, 0, 0)
+      body.position.set(0, 1, 0)
+      group.current.position.set(0, 1, 0)
+    },
+    [setPlayerHealth]
+  )
+
+  const handlePositionLerp = useCallback((worldPosition, group, secondGroup) => {
+    const lerpFactor = 0.15 // Adjust this value to see what works best
+    group.current.position.lerp(worldPosition, lerpFactor)
+    secondGroup.current.position.lerp(new THREE.Vector3(worldPosition.x, worldPosition.y + 1, worldPosition.z), lerpFactor)
+  }, [])
+
+  useFrame(({ raycaster, scene, camera, clock }, delta) => {
+    accumulator += delta
     updateLasers(group, delta)
     body.angularFactor.set(0, 0, 0)
     ref.current.getWorldPosition(worldPosition)
@@ -207,33 +218,48 @@ const Player = React.memo(function Player({ position }) {
     }
     handleQuaternionUpdate(worldPosition, group, targetQuaternion, rotationMatrix, distance, delta)
     let activeAction = setActiveAction(keyboard, delta)
-    handleInputVelocity(keyboard, delta, activeAction, prevActiveAction, actions, inputVelocity, body, velocity, euler, quat)
-    handleMixerUpdate(mixer, activeAction, delta, distance)
+    while (accumulator >= fixedDeltaTime) {
+      handleInputVelocity(keyboard, fixedDeltaTime, activeAction, prevActiveAction, actions, inputVelocity, body, velocity, euler, quat)
+      handleMixerUpdate(mixer, activeAction, fixedDeltaTime, distance)
+      accumulator -= fixedDeltaTime
+    }
 
     handlePositionLerp(worldPosition, group, secondGroup)
 
     if (playerHealth <= 0) {
       handleResetPosition(worldPosition, body, group, setFinished, setTime)
     }
+
+    if (reticule && reticule.current && secondGroup.current) {
+      const raycaster = new THREE.Raycaster()
+      raycaster.set(secondGroup.current.position, new THREE.Vector3(0, 0, -1))
+      const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(secondGroup.current.quaternion)
+      direction.multiplyScalar(10)
+      reticule.current.position.copy(secondGroup.current.position).add(direction).add(new THREE.Vector3(0, 0, 0))
+      reticule.current.material.depthTest = false
+      reticule.current.renderOrder = 1 // render this last
+    }
   })
 
   return (
-    <group ref={containerGroup} position={position}>
-      {/* First Eve component */}
-      <group ref={(groupRef) => (group.current = groupRef)} position={position}>
-        <Suspense fallback={null}>
-          <Eve />
-        </Suspense>
-      </group>
+    <>
+      <group ref={containerGroup} position={position}>
+        {/* First Eve component */}
+        <group ref={setGroupRef} position={position}>
+          <Suspense fallback={null}>
+            <Eve />
+          </Suspense>
+        </group>
 
-      {/* Second Eve component */}
-      <group ref={(secondGroupRef) => (secondGroup.current = secondGroupRef)} position={secondGroupPosition}>
-        <Suspense fallback={null}>
-          <Torso />
-        </Suspense>
+        {/* Second Eve component */}
+        <group ref={setSecondGroupRef} position={secondGroupPosition}>
+          <Suspense fallback={null}>
+            <Torso />
+          </Suspense>
+        </group>
+        <group ref={laserGroup}></group>
       </group>
-      <group ref={laserGroup}></group>
-    </group>
+    </>
   )
 })
 

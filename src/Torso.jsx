@@ -9,7 +9,7 @@ export default function Torso() {
   return (
     <>
       <group ref={ref}>
-        <mesh castShadow receiveShadow position={[0, 1, 0]}>
+        <mesh castShadow receiveShadow position={[0, 0, 0]}>
           <meshStandardMaterial color="grey" />
           <boxGeometry args={[0.3, 0.4, 0.8]} />
         </mesh>

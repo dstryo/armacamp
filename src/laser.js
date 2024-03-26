@@ -21,9 +21,7 @@ export const useLaser = (secondGroup, players) => {
   const laserMaterial = useMemo(
     () =>
       new THREE.MeshLambertMaterial({
-        color: 0x00eeff,
-        transparent: true,
-        opacity: 0.8
+        color: 0xff4500
       }),
     []
   )
@@ -48,11 +46,8 @@ export const useLaser = (secondGroup, players) => {
     lastFired = now
 
     const laserMesh = new THREE.Mesh(laserGeometry, laserMaterial)
-    laserMesh.position.set(secondGroup.current.position.x, secondGroup.current.position.y + 1, secondGroup.current.position.z)
+    laserMesh.position.set(secondGroup.current.position.x, secondGroup.current.position.y, secondGroup.current.position.z)
     laserMesh.quaternion.copy(secondGroup.current.quaternion)
-    const light = new THREE.PointLight(0xffffff, 10, 500)
-    light.position.set(0, 0, 0)
-    laserMesh.add(light)
 
     // Add the lasers to the scene
     laserGroup.current.add(laserMesh)
@@ -69,7 +64,7 @@ export const useLaser = (secondGroup, players) => {
       // Get all objects in the scene that the ray intersects
       lasers.forEach((laser, index) => {
         laserDirection.set(0, 0, -1).applyQuaternion(laser.quaternion)
-        laser.position.add(laserDirection.clone().multiplyScalar(100 * delta)) // Adjust the speed as needed
+        laser.position.add(laserDirection.clone().multiplyScalar(2)) // Adjust the speed as needed
         raycaster.set(laser.position, laserDirection)
         const intersects = raycaster.intersectObjects(scene.children)
 

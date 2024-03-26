@@ -10,7 +10,7 @@ export const useStore = create((set) => ({
       set((state) => ({ lasers: [...state.lasers, Date.now()] }))
       // Implement logic for firing lasers
     },
-    shoot: () => {
+    shootTurretLaser: () => {
       set((state) => ({ turretLasers: [...state.turretLasers] }))
       // Implement logic for firing lasers
     },

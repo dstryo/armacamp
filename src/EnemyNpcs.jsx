@@ -4,8 +4,9 @@ import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useLaser } from './laser'
 import { useStore } from './store'
+import { Html } from '@react-three/drei'
 
-const positions = [[5, 1, 0]]
+const positions = [[120, 1, 0]]
 
 function EnemyNpc({ position, players }) {
   const refPosition = new THREE.Vector3()
@@ -14,8 +15,8 @@ function EnemyNpc({ position, players }) {
   const turretLaserDirection = new THREE.Vector3()
   const laserPosition = new THREE.Vector3()
   const EnemyNpcPosition = new THREE.Vector3()
-  const EnemyNpcRadius = useMemo(() => (Math.sqrt(3) * 2) / 2.9, [])
-  const raycaster = new THREE.Raycaster()
+  const EnemyNpcRadius = useMemo(() => (Math.sqrt(3) * 2) / 3, [])
+  const raycaster = useMemo(() => new THREE.Raycaster(), [])
   const { decreasePlayerHealth } = useStore((state) => state.actions)
   const { scene } = useThree()
   const turretLasers = useStore((state) => state.turretLasers)
@@ -29,23 +30,25 @@ function EnemyNpc({ position, players }) {
   let lastFired = Date.now() - fireRate
   const fireRate = 600 // Fire rate in milliseconds
   const laserGeometry = useMemo(() => new THREE.BoxGeometry(0.1, 0.1, 1), [])
+  const htmlRef = useRef()
+
+  const shapes = useMemo(() => [
+    { args: [1, 1, 1], position: [0, 0, 0], type: 'Box' },
+    { args: [0.25, 0.5, 0.5], position: [0, 1.25, 0], type: 'Box' }
+  ])
   const [ref, api] = useCompoundBody(
     () => ({
       mass: 1,
       position: position,
-      shapes: [
-        { args: [1], position: [0, 0.25, 0], type: 'Sphere' },
-        { args: [1], position: [0, 0.75, 0], type: 'Box' }
-      ]
+      shapes,
+      material: 'slippery'
     }),
     useRef()
   )
   const laserMaterial = useMemo(
     () =>
       new THREE.MeshLambertMaterial({
-        color: 0x00eeff,
-        transparent: true,
-        opacity: 0.8
+        color: 0xff4500
       }),
     []
   )
@@ -63,10 +66,17 @@ function EnemyNpc({ position, players }) {
 
     turretLaserGroup.current.add(laserMesh)
     // Add the lasers to the scene
+    const adjustedPlayerPosition = players[0].clone()
+    adjustedPlayerPosition.y += 1 // Adjust the y-coordinate
 
+    direction.subVectors(adjustedPlayerPosition, turretRef.current.position)
+    direction.normalize()
+
+    // Store the direction with the laser
+    laserMesh.direction = direction.clone() // Make sure to clone the direction vector
     // Add the lasers to the state for later reference
     turretLasers.push(laserMesh)
-  }, [fireRate, laserGeometry, laserMaterial, turretLasers, turretRef, turretLaserGroup])
+  }, [fireRate, laserGeometry, laserMaterial, turretLasers, turretRef, turretLaserGroup, players])
 
   useFrame(() => {
     if (turretRef.current && players.length > 0) {
@@ -102,21 +112,20 @@ function EnemyNpc({ position, players }) {
       raycaster.linePrecision = 0.0001
 
       turretLasers.forEach((turretLaser, index) => {
-        turretLaserDirection.subVectors(playerPosition, turretRef.current.position)
-        turretLaserDirection.normalize() // Call normalize once
-        turretLaser.position.add(turretLaserDirection.clone().multiplyScalar(1.2))
+        turretLaser.position.add(turretLaser.direction.clone().multiplyScalar(1.5))
+
         // Adjust the speed as needed
         raycaster.set(turretLaser.position, turretLaserDirection)
         const distance = turretLaser.position.distanceTo(turretRef.current.position)
         const intersects = raycaster.intersectObjects(playerPosition)
         const distanceToPlayer = turretLaser.position.distanceTo(playerPosition)
 
-        if (distance > 100) {
+        if (distance > 60) {
           turretLaserGroup.current.remove(turretLaser)
           // Remove the laser from the state as well
           turretLasers.splice(turretLasers.indexOf(turretLaser), 1)
         }
-        if (distanceToPlayer <= 1) {
+        if (distanceToPlayer <= 1.2) {
           // Perform any additional logic here...
           turretLaserGroup.current.remove(turretLaser)
           // Remove the laser from the state as well
@@ -125,6 +134,11 @@ function EnemyNpc({ position, players }) {
           decreasePlayerHealth()
         }
       })
+      if (ref.current && htmlRef.current && htmlRef.current.position) {
+        const position = new THREE.Vector3()
+        position.setFromMatrixPosition(ref.current.matrixWorld)
+        htmlRef.current.position.set(position.x, position.y + 2, position.z)
+      }
     }
 
     //Map over Player lasers and check for collisions
@@ -140,7 +154,6 @@ function EnemyNpc({ position, players }) {
         // Check if the distance is less than the sum of the radii
         if (distance < EnemyNpcRadius) {
           setHealth(health - 10)
-          console.log('hit')
         }
       }
     })
@@ -158,6 +171,27 @@ function EnemyNpc({ position, players }) {
   return isActive ? (
     <>
       <group ref={ref}>
+        <Html ref={htmlRef} center position={[0, 2, 0]} zIndexRange={[1000, 1000]}>
+          <div
+            style={{
+              width: '50px',
+              height: '5px',
+              backgroundColor: 'white',
+              border: '1px solid black',
+              position: 'relative'
+            }}>
+            <div
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: `${health}%`,
+                height: '100%',
+                backgroundColor: 'red'
+              }}
+            />
+          </div>
+        </Html>
         <mesh castShadow receiveShadow>
           <boxGeometry args={[1, 1, 1]} position={[0, 1, 0]} />
           <meshStandardMaterial color="grey" />

@@ -5,6 +5,8 @@ import { Debug, Physics } from '@react-three/cannon'
 import { Suspense } from 'react'
 import { create } from 'zustand'
 import { AnimationMixer } from 'three'
+import { useStore } from './store'
+import HealthBar from './HealthBar'
 
 function Loader() {
   const { progress } = useProgress()
@@ -12,13 +14,14 @@ function Loader() {
 }
 
 export default function App() {
+  const { playerHealth } = useStore((state) => ({
+    playerHealth: state.playerHealth
+  }))
   return (
     <>
       <Canvas shadows onPointerDown={(e) => e.target.requestPointerLock()}>
         <Suspense fallback={<Loader />}>
-          <ambientLight />
           <spotLight position={[2.5, 5, 5]} angle={Math.PI / 3} penumbra={0.5} castShadow shadow-mapSize-height={2048} shadow-mapSize-width={2048} intensity={Math.PI * 25} />
-          <spotLight position={[-2.5, 5, 5]} angle={Math.PI / 3} penumbra={0.5} castShadow shadow-mapSize-height={2048} shadow-mapSize-width={2048} intensity={Math.PI * 25} />
 
           <Physics>
             <Game />
@@ -26,16 +29,7 @@ export default function App() {
           <Stats />
         </Suspense>
       </Canvas>
-      <div id="instructions">
-        WASD to move
-        <br />
-        SPACE to jump.
-        <br />
-        Model from{' '}
-        <a href="https://www.mixamo.com" target="_blank" rel="nofollow noreferrer">
-          Mixamo
-        </a>
-      </div>
+      <HealthBar health={playerHealth} />
     </>
   )
 }

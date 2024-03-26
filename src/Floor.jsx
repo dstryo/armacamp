@@ -18,9 +18,11 @@ export default function Floor() {
   }, [groundObjects, ref])
 
   return (
-    <mesh ref={ref} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-      <planeGeometry args={[100, 100]} />
-      <meshStandardMaterial />
-    </mesh>
+    <>
+      <mesh ref={ref} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <planeGeometry args={[1000, 1000]} />
+        <meshStandardMaterial />
+      </mesh>
+    </>
   )
 }

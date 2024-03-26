@@ -39,11 +39,12 @@ export default function useFollowCam(ref, offset) {
   useEffect(() => {
     scene.add(pivot)
     pivot.add(alt)
-    alt.position.y = offset[2.0]
+    alt.position.y = offset[1]
+
     alt.add(yaw)
     yaw.add(pitch)
     pitch.add(camera)
-    camera.position.set(offset[0], 0, offset[2])
+    camera.position.set(offset[0], 0, offset[2] + 1)
 
     alt.add(secondGroup)
 
@@ -60,5 +61,5 @@ export default function useFollowCam(ref, offset) {
     pivot.position.set(worldPosition.x, worldPosition.y, worldPosition.z)
   })
 
-  return { pivot, alt, yaw, pitch, secondGroup }
+  return { pivot, alt, yaw, pitch, secondGroup, camera }
 }
