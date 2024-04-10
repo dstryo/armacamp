@@ -1,37 +1,41 @@
-import React from 'react'
-import { Debug, useContactMaterial } from '@react-three/cannon'
-import Floor from './Floor'
-import EnemyNpcs from './EnemyNpcs'
-import Player from './Player'
-import { useControls } from 'leva'
-import Box from './Box'
-import Platform from './Platform'
-import { Environment, OrbitControls, Sky, SpotLight } from '@react-three/drei'
-import Wall from './Wall'
-import Model2 from './Model2'
-import Model3 from './Model3'
-import Model4 from './Model4'
-import Model5 from './Model5'
+import React, { useMemo, useRef } from 'react'
 
-function Game() {
-  useContactMaterial('ground', 'slippery', {
-    friction: 0,
-    restitution: 0.3,
-    contactEquationStiffness: 1e8,
-    contactEquationRelaxation: 3
-  })
-  console.log('running')
+import Player from './Player'
+import EnemyNpcs from './EnemyFleet'
+import { throttle } from 'lodash'
+
+const MemoizedPlayer = React.memo(Player)
+
+const Game = React.memo(function Game({ gameState, geckosClient }) {
+  const channel = useMemo(() => geckosClient.current, [geckosClient])
+  const throttledGameState = useMemo(() => throttle(() => gameState, 0.2), [gameState])
+
   return (
     <>
-      <Sky distance={450000} sunPosition={[0, 90, 0]} inclination={0} azimuth={0.25} />
+      <EnemyNpcs gameState={gameState} channel={channel} />
+      {Object.values(throttledGameState())
+        .filter((clientData) => !clientData.id.includes('enemy'))
+        .map((clientData) => {
+          const { id, position, rotation, torsoRotation, reticulePosition } = clientData
 
-      <Environment preset="sunset" background />
-      <Floor />
-      <Wall />
-
-      <Player position={[0, 0.5, 0]} />
+          return (
+            geckosClient.current && (
+              <MemoizedPlayer
+                id={id}
+                key={id}
+                position={position}
+                rotation={rotation}
+                channel={channel}
+                torsoRotation={torsoRotation}
+                reticulePosition={reticulePosition}
+                geckosClient={geckosClient}
+                gameState={gameState}
+              />
+            )
+          )
+        })}
     </>
   )
-}
+})
 
-export default React.memo(Game)
+export default Game
