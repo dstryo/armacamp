@@ -3,6 +3,11 @@ import { AnimationMixer } from 'three'
 
 export const useStore = create((set) => ({
   // Capture set here
+  planetPositions: {
+    planet1: [600, 0, 0]
+    // Add other planets if needed
+  },
+  enemyFleet: [],
   players: [],
   groundObjects: {},
   actions: {
@@ -14,21 +19,21 @@ export const useStore = create((set) => ({
       set((state) => ({ turretLasers: [...state.turretLasers] }))
       // Implement logic for firing lasers
     },
-    addPlayer: (playerGroup) => {
-      set((state) => ({ players: [playerGroup] })) // Now set is defined
-    },
-    decreasePlayerHealth: () => {
-      set((state) => ({ playerHealth: state.playerHealth - 10 }))
-    },
-    setPlayerHealth: (newHealth) => {
-      set({ playerHealth: newHealth })
+
+    setPlanetPosition: (planetName, newPosition) => {
+      set((state) => ({
+        planetPosition: {
+          ...state.planetPosition,
+          [planetName]: newPosition
+        }
+      }))
     }
+
     //toggleSound: (sound) => {
     // Implement logic for toggling sound
     //}
     // ... Other existing actions
   },
-  playerHealth: 100,
   lasers: [], // New state for storing laser shots
   turretLasers: [],
   mixer: new AnimationMixer()
