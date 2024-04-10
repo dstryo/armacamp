@@ -34,7 +34,6 @@ export const useStore = create((set) => ({
     //}
     // ... Other existing actions
   },
-
   lasers: [], // New state for storing laser shots
   turretLasers: [],
   mixer: new AnimationMixer()
