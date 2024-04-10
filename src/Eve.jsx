@@ -1,7 +1,7 @@
-import { useRef } from 'react'
+import React, { useRef } from 'react'
 import { useGLTF } from '@react-three/drei'
 import { useEffect } from 'react'
-import { useStore } from './App'
+import { Hull } from './Hull'
 
 export default function Eve() {
   const ref = useRef()
@@ -10,8 +10,7 @@ export default function Eve() {
     <>
       <group ref={ref}>
         <mesh castShadow receiveShadow>
-          <meshStandardMaterial color="grey" />
-          <boxGeometry args={[1, 1, 1]} />
+          <Hull />
         </mesh>
       </group>
     </>
