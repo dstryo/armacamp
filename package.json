@@ -2,7 +2,7 @@
   "type": "module",
   "name": "react-three-fiber-boilerplate-cannon-compound-shapes",
   "version": "1.0.0",
-  "description": "R3F Course : https://sbcode.net/react-three-fiber/ \n\nCoupons : https://sbcode.net/coupons \n",
+  "description": "Capital-Ship",
   "keywords": [],
   "main": "src/index.jsx",
   "dependencies": {
